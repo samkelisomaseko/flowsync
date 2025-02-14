@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowSync - Smooth Dynamic Data Exchange</title>
+    <meta name="theme-color" content="#ffffff">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Exo:wght@500&family=Rajdhani:wght@500&family=SF+Pro+Display:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* General Styles */
+        :root {
+            --primary-color: #007aff;
+            --secondary-color: #343A40;
+            --success-color: #4CAF50;
+            --error-color: #F44336;
+            --background-color: #ffffff;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+                Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-image: url('astra2.jpg');
+            background-size: cover;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        body:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Widget Container */
+        .widget-container {
+            position: fixed;
+            top: clamp(1rem, 3vh, 3rem);
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(280px, 40vw, 350px);
+            height: clamp(280px, 40vw, 350px);
+            background: var(--background-color);
+            border-radius: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Fluid Styles */
+        .fluid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            transform: translateY(0);
+            transition: transform 5s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: visible;
+        }
+
+        .fluid.active {
+            transform: translateY(-150px) scale(0.9);
+        }
+
+        .fluid::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 110%;
+            height: 110%;
+            background: linear-gradient(45deg, #035afc, #781be0, #dc1136, #f57c04);
+            filter: blur(30px);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: move 5s linear infinite;
+            transition: transform 5s cubic-bezier(0.16, 1, 0.3, 1), filter 0.4s ease, border-radius 5s ease;
+        }
+
+        .fluid.active::before {
+            filter: blur(50px);
+            transform: translate(-50%, -150px);
+            animation: blob 5s infinite;
+            border-radius: 20%;
+        }
+
+        @keyframes move {
+            0% {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) rotate(180deg);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+
+        @keyframes blob {
+            0%,
+            100% {
+                border-radius: 50%;
+            }
+
+            50% {
+                border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            }
+        }
+
+        /* Content Area */
+        .content {
+            position: relative;
+            z-index: 10;
+            color: var(--text-color);
+            font-size: clamp(1.2rem, 3vw, 1.5rem);
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            padding: clamp(10px, 2vw, 15px);
+        }
+
+        .message {
+            opacity: 1;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: opacity 0.3s ease, transform 0.5s ease;
+        }
+
+        /* Status Messages */
+        .success-message,
+        .error-message,
+        .loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(1.4rem, 3.5vw, 1.75rem);
+            font-weight: bold;
+            color: var(--background-color);
+            opacity: 0;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .success-message {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--success-color);
+        }
+
+        .error-message {
+            font-family: 'Exo', sans-serif;
+            color: var(--error-color);
+        }
+
+        .loading-message {
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--primary-color);
+            animation: loadingText 1.5s infinite ease-in-out;
+        }
+
+        /* Retry Button */
+        .retry-button {
+            position: absolute;
+            bottom: clamp(1rem, 3vh, 2rem);
+            left: 50%;
+            transform: translateX(-50%);
+            padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 24px);
+            background-color: var(--secondary-color);
+            color: var(--background-color);
+            border: 2px solid var(--success-color);
+            border-radius: 10px;
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            opacity: 0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+        }
+
+        .retry-button:hover {
+            transform: translate(-50%, -2px) scale(1.02);
+            background-color: #3E4349;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Loading Text Animation */
+        @keyframes loadingText {
+            0% {
+                transform: translate(-50%, -50%);
+            }
+
+            25% {
+                transform: translate(-50%, -48%);
+            }
+
+            50% {
+                transform: translate(-50%, -50%);
+            }
+
+            75% {
+                transform: translate(-50%, -52%);
+            }
+
+            100% {
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        /* Custom Button */
+        .custom-button {
+            background: rgba(255, 255, 255, 0.8);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 12px;
+            padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 24px);
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            font-weight: 800;
+            margin-top: clamp(5px, 1vw, 8px);
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            text-shadow: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+                Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            user-select: none;
+        }
+
+        .custom-button:hover,
+        .custom-button:active {
+            background: var(--primary-color);
+            color: white;
+            transform: scale(1.03);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary-color);
+        }
+
+        .custom-button:disabled {
+            background: rgba(200, 200, 200, 0.5);
+            color: rgba(100, 100, 100, 0.5);
+            border-color: rgba(150, 150, 150, 0.5);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .custom-button:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3);
+        }
+
+        /* File List */
+        #fileList {
+            margin-top: clamp(5px, 1vw, 10px);
+            color: var(--text-color);
+            text-align: left;
+            width: 90%;
+            max-height: clamp(50px, 15vw, 100px);
+            overflow-y: auto;
+            padding: clamp(2px, 1vw, 5px);
+        }
+
+        #fileList li {
+            margin: clamp(2px, 0.5vw, 5px) 0;
+            font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+            padding: clamp(4px, 1vw, 8px);
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        #fileList li:hover {
+            box-shadow: 0 3px 7px rgba(0, 0, 0, 0.2);
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Confetti Container */
+        #confetti-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .confetti {
+            position: absolute;
+            width: clamp(5px, 1.5vw, 8px);
+            height: clamp(5px, 1.5vw, 8px);
+            border-radius: 50%;
+            opacity: 0;
+            animation: confettiFallSilver 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .confetti.silver-1 {
+            background-color: #C0C0C0;
+        }
+
+        .confetti.silver-2 {
+            background-color: #A9A9A9;
+        }
+
+        .confetti.silver-3 {
+            background-color: #D3D3D3;
+        }
+
+        .confetti.silver-4 {
+            background-color: #BDBDBD;
+        }
+
+        .confetti.silver-5 {
+            background-color: #E0E0E0;
+        }
+
+        @keyframes confettiFallSilver {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -100%) rotate(calc(var(--random-angle, 0) * 1deg));
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, 800%) rotate(calc(var(--random-angle, 0) * 1deg));
+            }
+        }
+
+        /* iOS Switch */
+        .ios-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .ios-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Footer Container */
+        .footer-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 98%;
+            background: linear-gradient(45deg, #035afc, #781be0, #dc1136, #f57c04);
+            border-radius: 30px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: clamp(5px, 1.5vw, 10px);
+            text-align: center;
+            box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        /* Progress Bar Container */
+        .progress-bar-container {
+            width: clamp(150px, 60vw, 250px);
+            margin-top: clamp(10px, 3vw, 15px);
+            margin-bottom: clamp(5px, 1.5vw, 10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            opacity: 0;
+            /* Initially hidden */
+            transition: opacity 0.3s ease;
+        }
+
+        .progress-bar-container.visible {
+            opacity: 1;
+            /* Make visible when needed */
+        }
+
+
+        .progress-circle {
+            width: clamp(15px, 4vw, 25px);
+            height: clamp(15px, 4vw, 25px);
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-color);
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+            position: relative;
+            z-index: 2;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+
+        .progress-circle.completed {
+            border-color: var(--success-color);
+        }
+
+        .progress-circle.current {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .progress-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #ccc;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        .progress-line-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0;
+            transition: width 0.5s cubic-bezier(.68, -0.55, .27, 1.55);
+            border-radius: inherit;
+        }
+
+        /* Drag and Drop Area */
+        .drag-drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            padding: clamp(10px, 3vw, 15px);
+            text-align: center;
+            margin-top: clamp(10px, 3vw, 15px);
+            transition: background-color 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drag-drop-area.drag-over {
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        .drag-drop-area p {
+            opacity: 1;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: opacity 0.3s ease, transform 0.5s ease;
+        }
+
+        /* Receiving State */
+        .receiving {
+            padding: clamp(5px, 1.5vw, 10px);
+        }
+
+        /* NFC Status */
+        #nfcStatus {
+            font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+            color: var(--text-color);
+        }
+
+        /* Media Queries for smaller screens */
+        @media (max-width: 600px) {
+            .footer-container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .progress-bar-container {
+                width: 80%;
+            }
+
+            #nfcStatus {
+                margin-top: 5px;
+            }
+        }
+
+        /* Override Widget-Container */
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        .widget-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 400px;
+            height: auto;
+            max-height: 80%;
+            background: white;
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        /* Adjustments for Content within Widget */
+        .content {
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Full-Width Button */
+        .custom-button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        /* List of Files */
+        #fileList {
+            margin-top: 10px;
+            color: #333;
+            text-align: left;
+            width: 90%;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        #fileList li {
+            margin: 5px 0;
+            font-size: 14px;
+            padding: 8px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        #fileList li:hover {
+            box-shadow: 0 3px 7px rgba(0, 0, 0, 0.2);
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* File Transfer Animation Styles */
+        #transferAnimation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            /* Cover the top half of the screen */
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 15;
+            /* Ensure it's above other elements but below confetti */
+        }
+
+        .file-icon {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: var(--primary-color);
+            border-radius: 5px;
+            opacity: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-icon i {
+            /* Example for using Font Awesome icons */
+            font-style: normal;
+        }
+
+         /* Dynamic Island Styles */
+        .dynamic-island-container {
+            position: fixed;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none; /* Ensure it doesn't block clicks */
+        }
+
+        .dynamic-island {
+            /* Styles from the previous example */
+            position: relative; /* Required for absolute positioning of child elements */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem; /* Adjust padding for smaller screens */
+            background: rgba(255, 255, 255, 0.2); /* Semi-transparent white background */
+            backdrop-filter: blur(10px); /* Apply a subtle blur */
+            border-radius: 1rem;
+            color: #fff; /* White text */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+            font-size: 0.8rem; /* Adjust font size for smaller screens */
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+                Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            font-weight:bold;
+        }
+
+        .uploading-icon, .downloading-icon, .complete-icon {
+            /* Styles for the icons */
+            margin-right: 0.5rem; /* Add spacing between the icon and text */
+            width: 1rem; /* Adjust icon size */
+            height: 1rem;
+            display: inline-block; /* Ensures icon is inline with text */
+            
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/MotionPathPlugin.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/EasePack.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+</head>
+
+<body>
+    <div class="widget-container" id="widgetContainer">
+        <div class="fluid" id="fluidBackground"></div>
+        <div id="transferAnimation"></div>
+        <div class="content">
+            <div class="message" id="message">Tap to start FlowSync</div>
+            <div class="drag-drop-area" id="dragDropArea">
+                <p>Drag and drop files here</p>
+            </div>
+            <input type="file" id="fileInput" multiple accept="*" style="display: none;">
+            <button id="selectFilesButton" class="custom-button">Select Files</button>
+            <ul id="fileList"></ul>
+
+        </div>
+        <div class="success-message hidden" id="successMessage">Transfer Complete!</div>
+        <div class="error-message hidden" id="errorMessage">Transfer Failed</div>
+        <div class="loading-message hidden" id="loadingMessage">Transferring...</div>
+        <div class="radial-gradient"></div>
+        <button class="retry-button hidden" id="retryButton">Retry</button>
+        <div id="confetti-container"></div>
+    </div>
+
+    <!-- Dynamic Island Container -->
+    <div class="dynamic-island-container">
+        <div class="dynamic-island" id="dynamicIsland">
+            <span id="dynamicIslandText"></span>
+        </div>
+    </div>
+
+    <div class="footer-container">
+        <div class="progress-bar-container" id="progressBarContainer">
+            <div class="progress-line">
+                <div class="progress-line-fill" id="progressLineFill"></div>
+            </div>
+            <div class="progress-circle completed">
+                ✓
+            </div>
+            <div class="progress-circle current">
+                2
+            </div>
+            <div class="progress-circle">
+                3
+            </div>
+        </div>
+        <div class="receiving">
+            <button id="receiveModeButton" class="custom-button">Enter Receive Mode</button>
+        </div>
+        <label class="ios-switch">
+            <input type="checkbox" id="nfcToggle">
+            <span class="slider"></span>
+        </label>
+        <span id="nfcStatus">NFC Disabled</span>
+    </div>
+
+    <script>
+        // Main application code
+        const body = document.body; // Reference to the body
+        const container = document.getElementById('widgetContainer');
+        const fluidBackground = document.getElementById('fluidBackground');
+        const message = document.getElementById('message');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const retryButton = document.getElementById('retryButton');
+        const fileInput = document.getElementById('fileInput');
+        const selectFilesButton = document.getElementById('selectFilesButton');
+        const fileList = document.getElementById('fileList');
+        const confettiContainer = document.getElementById('confetti-container');
+        const nfcToggle = document.getElementById('nfcToggle');
+        const nfcStatus = document.getElementById('nfcStatus');
+        const receiveModeButton = document.getElementById('receiveModeButton');
+        const dragDropArea = document.getElementById('dragDropArea');
+        const progressLineFill = document.getElementById('progressLineFill');
+        const progressCircles = document.querySelectorAll('.progress-circle');
+        const progressBarContainer = document.getElementById('progressBarContainer'); //Progress Bar
+        const transferAnimationContainer = document.getElementById('transferAnimation'); //Animation Section
+
+        const dynamicIsland = document.getElementById('dynamicIsland'); //dynamic island
+        const dynamicIslandText = document.getElementById('dynamicIslandText'); //dynamic island Text
+
+        let isAnimating = false;
+        let selectedFiles = [];
+        let isReceiving = false;
+        let peer;
+        let receivedBuffers = [];
+        let receivedFileMeta = null;
+        let currentFileProgress = 0;
+        let totalProgress = 0;
+        let transferredFiles = 0;
+        const numProgressSteps = 3;
+        let peerId = null; // Store the peer ID generated by PeerJS
+
+        // Audio setup
+        const startSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3');
+        const successSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-magical-soft-sweep-2014.mp3');
+        const errorSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alert-quick-chime-766.mp3');
+
+        // Initialize PeerJS connection
+        function initializePeer() {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                console.log('My Peer ID is: ' + id);
+                peerId = id; // Store the peer ID
+                message.textContent = `Ready! Peer ID: ${id}. Share this ID to connect.`;
+            });
+
+            peer.on('connection', (conn) => {
+                console.log('Incoming connection!');
+                connectPeer(conn); // Use the existing connectPeer function
+            });
+
+            peer.on('disconnected', () => {
+                console.log('Connection lost. Reconnecting...');
+            });
+
+            peer.on('close', () => {
+                console.log('Peer connection closed.');
+                resetUI();
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                handleTransferError('PeerJS error');
+            });
+        }
+
+        // Connect to another peer
+        function connectToPeer(otherPeerId) {
+            console.log('Attempting to connect to Peer ID: ' + otherPeerId);
+            const conn = peer.connect(otherPeerId);
+            connectPeer(conn);
+        }
+
+        // Handle connection events
+        function connectPeer(conn) {
+            conn.on('open', () => {
+                console.log('Connected to peer!');
+                message.textContent = 'Connected to peer';
+            });
+
+            conn.on('data', handleIncomingData);
+
+            conn.on('close', () => {
+                console.log('Connection closed by peer.');
+                resetUI();
+            });
+
+            conn.on('error', (err) => {
+                console.error('Connection error:', err);
+                handleTransferError('Connection error');
+            });
+        }
+
+                // Improved file transfer process
+        async function startTransfer() {
+            if (isAnimating || selectedFiles.length === 0) return;
+
+            isAnimating = true;
+            startSound.play();
+
+            // UI updates
+            message.textContent = 'Initiating transfer...';
+
+            //GSAP spring animation
+            gsap.to(loadingMessage, {
+                opacity: 1,
+                scale: 1,
+                duration: 0.8,
+                ease: "elastic.out(1, 0.3)"
+            });
+
+            // Make progress bar visible
+            progressBarContainer.classList.add('visible');
+
+            // No longer setting up a new peer, using the existing PeerJS peer
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const fileId = `file-${Date.now()}-${i}`;
+
+                // Animate file sending
+                animateFileTransfer('upload');
+                 onUploadStart(file.name);
+
+                // Send file metadata
+                peer.send(JSON.stringify({
+                    type: 'file-meta',
+                    id: fileId,
+                    name: file.name,
+                    size: file.size,
+                    fileType: file.type
+                }));
+
+                // Send file in chunks
+                const chunkSize = 16384; // 16KB chunks
+                const fileReader = new FileReader();
+                let offset = 0;
+
+                fileReader.onload = function (e) {
+                    peer.send(JSON.stringify({
+                        type: 'file-chunk',
+                        id: fileId,
+                        chunk: e.target.result
+                    }));
+                    offset += e.target.result.byteLength;
+                    currentFileProgress = (offset / file.size) * 100;
+                    updateProgressUI();
+                    onUploadProgress(file.name, currentFileProgress);
+
+                    if (offset < file.size) {
+                        readSlice(offset);
+                    } else {
+                        // File transfer complete
+                        transferredFiles++;
+                        if (transferredFiles === selectedFiles.length) {
+                            handleTransferSuccess();
+                            onTransferComplete();
+                        }
+                    }
+                };
+
+                const readSlice = (o) => {
+                    const slice = file.slice(o, o + chunkSize);
+                    fileReader.readAsArrayBuffer(slice);
+                };
+
+                readSlice(0);
+            }
+        }
+
+        // Handle incoming data
+        function handleIncomingData(data) {
+            try {
+                const parsedData = JSON.parse(data);
+                if (parsedData.type === 'file-meta') {
+                    receivedFileMeta = parsedData;
+                    receivedBuffers = [];
+                    console.log(`Receiving file: ${receivedFileMeta.name}`);
+                    message.textContent = `Receiving: ${receivedFileMeta.name}`;
+
+                    onDownloadStart(receivedFileMeta.name); // Start download activity
+
+                    //Animate Receiving File
+                    animateFileTransfer('download');
+                } else if (parsedData.type === 'file-chunk') {
+                    receivedBuffers.push(parsedData.chunk);
+                    updateReceivingProgress();
+                    const progress = (receivedBuffers.length * 16384 / receivedFileMeta.size) * 100; // Calculate Download Progress
+                    onDownloadProgress(receivedFileMeta.name, progress);
+                    if (receivedBuffers.length * 16384 >= receivedFileMeta.size) {
+                        saveReceivedFile();
+                    }
+                }
+            } catch (e) {
+                console.warn('Received non-JSON data', data);
+            }
+        }
+
+        // Save received file
+        function saveReceivedFile() {
+            const blob = new Blob(receivedBuffers, {
+                type: receivedFileMeta.fileType
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = receivedFileMeta.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log(`File saved: ${receivedFileMeta.name}`);
+            handleTransferSuccess();
+             onTransferComplete();
+            receivedFileMeta = null;
+            receivedBuffers = [];
+        }
+
+        // Update progress UI
+        function updateProgressUI() {
+            const totalProgress = (transferredFiles + currentFileProgress / 100) / selectedFiles.length * 100;
+            const progressPercentage = totalProgress;
+            updateProgressBar(progressPercentage);
+        }
+
+        // Update receiving progress
+        function updateReceivingProgress() {
+            if (receivedFileMeta) {
+                const progress = (receivedBuffers.length * 16384 / receivedFileMeta.size) * 100;
+                updateProgressBar(progress);
+            }
+        }
+
+        function updateProgressBar(progressPercentage) {
+            const clampedProgress = Math.min(100, Math.max(0, progressPercentage));
+            const progressWidth = `${clampedProgress}%`;
+
+            gsap.to(progressLineFill, {
+                duration: 1.2,
+                width: progressWidth,
+                ease: "power3.out",
+            });
+
+            let currentStep = Math.floor((clampedProgress / 100) * numProgressSteps) + 1;
+            currentStep = Math.min(numProgressSteps, Math.max(1, currentStep));
+
+            progressCircles.forEach((circle, index) => {
+                const stepIndex = index + 1;
+                if (stepIndex < currentStep) {
+                    circle.classList.add('completed');
+                    circle.classList.remove('current');
+                } else if (stepIndex === currentStep) {
+                    circle.classList.add('current');
+                    circle.classList.remove('completed');
+                } else {
+                    circle.classList.remove('completed', 'current');
+                }
+            });
+
+            loadingMessage.textContent = `Transferring... ${Math.round(clampedProgress)}%`;
+        }
+
+        // Drag and drop functionality
+        dragDropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragDropArea.classList.add('drag-over');
+        });
+
+        dragDropArea.addEventListener('dragleave', () => {
+            dragDropArea.classList.remove('drag-over');
+        });
+
+        dragDropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragDropArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            updateFileList();
+        }
+
+        // NFC pairing
+        async function startNFCPairing() {
+            if ('NDEFReader' in window) {
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.scan();
+                    ndef.onreading = ({
+                        message
+                    }) => {
+                        for (const record of message.records) {
+                            if (record.recordType === "mime" && record.mediaType === "application/json") {
+                                const decoder = new TextDecoder();
+                                const peerData = JSON.parse(decoder.decode(record.data));
+                                connectToPeer(peerData);
+                            }
+                        }
+                    }
+                    console.log("Scan started successfully.");
+                    nfcStatus.textContent = "NFC: Scanning...";
+                } catch (error) {
+                    console.log(`Error! Scan failed to start: ${error}.`);
+                    nfcStatus.textContent = "NFC: Error";
+                }
+            }
+        }
+
+        // Connect to peer using NFC data
+        function connectToPeer(peerData) {
+            console.log("Connecting to peer:", peerData);
+            connectToPeer(peerId);
+        }
+
+        // Error handling
+        function handleTransferError(errorMsg) {
+            errorSound.play();
+            errorMessage.textContent = errorMsg || "Transfer failed";
+            gsap.to(errorMessage, {
+                opacity: 1,
+                scale: 1,
+                duration: 0.5,
+                ease: "elastic.out(1, 0.3)"
+            });
+            gsap.to(loadingMessage, {
+                opacity: 0,
+                scale: 0.8,
+                duration: 0.3
+            });
+            gsap.to(retryButton, {
+                opacity: 1,
+                duration: 0.5,
+                delay: 0.3
+            });
+        }
+
+        // Success handling
+        function handleTransferSuccess() {
+            successSound.play();
+            gsap.to(successMessage, {
+                opacity: 1,
+                scale: 1,
+                duration: 0.5,
+                ease: "elastic.out(1, 0.3)"
+            });
+            startConfetti();
+        }
+
+        // Reset UI
+        function resetUI() {
+            isAnimating = false;
+            gsap.to([successMessage, errorMessage, loadingMessage, retryButton], {
+                opacity: 0,
+                scale: 0.8,
+                duration: 0.5,
+                onComplete: () => {
+                    [successMessage, errorMessage, loadingMessage, retryButton].forEach(el => el.classList.add('hidden'));
+                    message.textContent = "Tap to start FlowSync";
+                    gsap.to(message, {
+                        opacity: 1,
+                        duration: 0.3
+                    });
+                }
+            });
+            gsap.to(progressLineFill, {
+                duration: 0.5,
+                width: '0%',
+                ease: "power2.inOut"
+            });
+            progressCircles.forEach((circle, index) => {
+                const stepIndex = index + 1;
+                circle.classList.remove('completed', 'current');
+                if (stepIndex === 1) {
+                    circle.classList.add('completed');
+                }
+            });
+
+            // Hide progress bar
+            progressBarContainer.classList.remove('visible');
+            transferAnimationContainer.innerHTML = ''; // Clear animations
+
+             // Update Dynamic Island to idle
+            updateActivity('idle');
+
+            if (isReceiving) {
+                const totalProgress = (transferredFiles + currentFileProgress / 100) / selectedFiles.length * 100;
+                const progressPercentage = totalProgress;
+                updateProgressBar(progressPercentage);
+            } else {
+                progressCircles.forEach((circle, index) => {
+                    if (index + 1 == 2) {
+                        circle.classList.add('current')
+                    }
+                })
+            }
+
+
+        }
+
+        // Event listeners
+        selectFilesButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (event) => handleFiles(event.target.files));
+        body.addEventListener('click', startTransfer); // Click anywhere on body
+        retryButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetUI();
+        });
+        receiveModeButton.addEventListener('click', () => {
+            isReceiving = !isReceiving;
+            if (isReceiving) {
+                receiveModeButton.textContent = "Stop Receiving";
+                message.textContent = "Waiting for incoming files...";
+                connectToPeer(peerId);
+                // Make progress bar visible
+                progressBarContainer.classList.add('visible');
+            } else {
+                receiveModeButton.textContent = "Enter Receive Mode";
+                message.textContent = "Tap to start FlowSync";
+                if (peer) peer.destroy();
+                resetUI();
+            }
+        });
+        nfcToggle.addEventListener('change', () => {
+            if (nfcToggle.checked) {
+                nfcStatus.textContent = "NFC: Enabled";
+                startNFCPairing();
+            } else {
+                nfcStatus.textContent = "NFC: Disabled";
+                // Stop NFC scanning if applicable
+            }
+        });
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            selectedFiles.forEach(file => {
+                const li = document.createElement('li');
+                li.textContent = file.name;
+                fileList.appendChild(li);
+            });
+        }
+
+        function animateFluid() {
+            if (isAnimating) return;
+
+            fluidBackground.style.animation = 'move 20s linear infinite, blob 5s infinite';
+        }
+
+        function startConfetti() {
+            const confettiCount = 80;
+            const silverClasses = ['silver-1', 'silver-2', 'silver-3', 'silver-4', 'silver-5'];
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+
+                const silverClass = silverClasses[Math.floor(Math.random() * silverClasses.length)];
+                confetti.classList.add(silverClass);
+
+                confetti.style.left = `${Math.random() * 100}%`;
+                confetti.style.animationDelay = `${Math.random() * 0.3}s`;
+                confetti.style.setProperty('--random-angle', String(Math.floor(Math.random() * 360)));
+
+                confettiContainer.appendChild(confetti);
+            }
+
+            setTimeout(() => {
+                confettiContainer.innerHTML = '';
+            }, 2500);
+        }
+
+        // Initialize
+        function checkNFCSupport() {
+            if ("NDEFReader" in window) {
+                console.log("Web NFC API is supported");
+                nfcStatus.textContent = "NFC Enabled";
+                nfcToggle.checked = true;
+            } else {
+                console.log("Web NFC API is not supported in this browser.");
+                nfcStatus.textContent = "NFC Not Supported";
+                nfcToggle.disabled = true;
+            }
+        }
+
+        // Dynamic Island Functions
+        function onUploadStart(filename) {
+            dynamicIslandText.textContent = `Uploading: ${filename}`;
+        }
+
+        function onUploadProgress(filename, progress) {
+            dynamicIslandText.textContent = `Uploading: ${filename} - ${Math.round(progress)}%`;
+        }
+
+        function onDownloadStart(filename) {
+             dynamicIslandText.textContent = `Downloading: ${filename}`;
+        }
+
+        function onDownloadProgress(filename, progress) {
+            dynamicIslandText.textContent = `Downloading: ${filename} - ${Math.round(progress)}%`;
+        }
+
+        function onTransferComplete() {
+            dynamicIslandText.textContent = 'Transfer Complete!';
+             setTimeout(() => {
+                dynamicIslandText.textContent = ''; // Clear the text after a delay
+            }, 2000);
+        }
+
+        checkNFCSupport();
+        animateFluid();
+        initializePeer();
+
+        // Initialize the progress bar
+        updateProgressBar(0);
+
+        function animateFileTransfer(direction) {
+            const fileIcon = document.createElement('div');
+            fileIcon.classList.add('file-icon');
+            fileIcon.innerHTML = '<i class="fas fa-file"></i>'; // Using Font Awesome icon
+
+            transferAnimationContainer.appendChild(fileIcon);
+
+            const startY = direction === 'upload' ? '80%' : '-20%'; // Start from bottom for upload, top for download
+            const endY = direction === 'upload' ? '-20%' : '80%'; // End at top for upload, bottom for download
+
+            gsap.fromTo(fileIcon, {
+                y: startY,
+                x: `${Math.random() * 80 + 10}%`, // Random horizontal position
+                opacity: 1,
+                scale: 0.5
+            }, {
+                y: endY,
+                x: `${Math.random() * 80 + 10}%`,
+                opacity: 0.8,
+                scale: 1,
+                duration: 1.5,
+                ease: "power2.inOut",
+                onComplete: () => {
+                    transferAnimationContainer.removeChild(fileIcon);
+                }
+            });
+        }
+    </script>
+
+</body>
+
+</html>
